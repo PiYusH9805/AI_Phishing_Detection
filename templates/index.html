@@ -1,0 +1,7 @@
+{# Rollback switch: set USE_OLD_UI to true to render templates/index_backup.html. #}
+{% set USE_OLD_UI = true %}
+{% if USE_OLD_UI %}
+{% include 'index_backup.html' %}
+{% else %}
+{% include 'index_new.html' %}
+{% endif %}

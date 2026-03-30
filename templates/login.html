@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Security Shield | Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+</head>
+<body class="theme-shell auth-shell">
+    <div class="background-effects" aria-hidden="true">
+        <div class="grid-overlay"></div>
+        <div class="circuit-lines"></div>
+        <div class="glow-orb glow-orb-a"></div>
+        <div class="glow-orb glow-orb-b"></div>
+        <div class="tech-shape tech-shape-a"></div>
+        <div class="tech-shape tech-shape-b"></div>
+        <div class="particles">
+            {% for _ in range(16) %}
+            <span class="particle"></span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <main class="auth-layout">
+        <section class="auth-panel glass-panel auth-panel-main reveal-fade">
+            <div class="auth-copy">
+                <div class="eyebrow">Cybersecurity Access Control</div>
+                <h1>Secure the AI Security Shield</h1>
+                <p class="subtitle">Authenticate before opening the phishing analysis workspace for URL and email investigations.</p>
+                <div class="auth-highlights">
+                    <div class="metric-chip">
+                        <span>Protected Access</span>
+                        <strong>Session Guard</strong>
+                    </div>
+                    <div class="metric-chip">
+                        <span>Password Storage</span>
+                        <strong>Hashed</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="auth-visual auth-visual-login">
+                <div class="shield-core auth-shield-core">
+                    <div class="shield-ring"></div>
+                    <div class="shield-icon auth-shield-icon">
+                        <svg viewBox="0 0 120 120" aria-hidden="true">
+                            <path d="M60 10 98 24v31c0 24.3-15.1 46.5-38 55C37.1 101.5 22 79.3 22 55V24L60 10Z" />
+                            <path d="M60 38a10 10 0 0 1 10 10v6h2a8 8 0 0 1 8 8v18a8 8 0 0 1-8 8H48a8 8 0 0 1-8-8V62a8 8 0 0 1 8-8h2v-6a10 10 0 0 1 10-10Z" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="auth-visual-copy">AI Security Shield</div>
+            </div>
+        </section>
+
+        <section class="auth-panel glass-panel auth-form-panel reveal-up">
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">Login</div>
+                    <h2>Access Dashboard</h2>
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <section class="flash-stack">
+                {% for category, message in messages %}
+                <div class="flash-card flash-{{ category }} glass-panel">{{ message }}</div>
+                {% endfor %}
+            </section>
+            {% endif %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('auth.login') }}" class="scan-form js-auth-form">
+                <input type="hidden" name="next" value="{{ next_target }}">
+                <label for="identity">Username or Email</label>
+                <input id="identity" name="identity" type="text" maxlength="120" value="{{ request.form.get('identity', '') }}" placeholder="analyst@securitylab.com" required>
+
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" maxlength="128" placeholder="Enter your password" required>
+
+                <div class="form-actions auth-form-actions">
+                    <button type="submit" class="primary-button auth-submit">
+                        <span class="button-text">Login to Shield</span>
+                        <span class="button-loader" aria-hidden="true"></span>
+                    </button>
+                </div>
+            </form>
+
+            <p class="auth-footer-copy">No account yet? <a href="{{ url_for('auth.signup', next=next_target) }}">Create one</a></p>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+</body>
+</html>

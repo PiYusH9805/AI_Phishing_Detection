@@ -1,0 +1,620 @@
+{% macro confidence_label(score) -%}
+    {%- set score_value = score|float -%}
+    {%- if score_value <= 40 -%}
+        LOW
+    {%- elif score_value <= 70 -%}
+        MEDIUM
+    {%- else -%}
+        HIGH
+    {%- endif -%}
+{%- endmacro %}
+{% macro render_explanation_panel(points) -%}
+    {% if points %}
+    <div class="explanation-panel">
+        <div class="explanation-header">
+            <div class="eyebrow">AI Explanation</div>
+            <h4>Why the system flagged this result</h4>
+        </div>
+        <ul class="explanation-list">
+            {% for point in points %}
+            <li class="explanation-item">
+                <span class="explanation-icon" aria-hidden="true">✔</span>
+                <span>{{ point }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+{%- endmacro %}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Phishing Detection System | Cybersecurity Dashboard</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Rollback copy keeps the original homepage styling intact. -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_backup.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+</head>
+<body class="theme-shell" data-active-panel="{{ active_panel }}">
+    <div class="background-effects" aria-hidden="true">
+        <div class="grid-overlay"></div>
+        <div class="circuit-lines"></div>
+        <div class="glow-orb glow-orb-a"></div>
+        <div class="glow-orb glow-orb-b"></div>
+        <div class="tech-shape tech-shape-a"></div>
+        <div class="tech-shape tech-shape-b"></div>
+        <div class="particles">
+            {% for _ in range(18) %}
+            <span class="particle"></span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="scan-overlay" id="scan-overlay" aria-hidden="true">
+        <div class="scan-overlay-card glass-panel">
+            <div class="scan-radar" aria-hidden="true">
+                <div class="scan-grid"></div>
+                <div class="scan-rings">
+                    <span></span><span></span><span></span>
+                </div>
+                <div class="scan-sweep"></div>
+            </div>
+            <div class="scan-shield">
+                <svg viewBox="0 0 120 120" aria-hidden="true">
+                    <path d="M60 10 98 24v31c0 24.3-15.1 46.5-38 55C37.1 101.5 22 79.3 22 55V24L60 10Z" />
+                </svg>
+            </div>
+            <h2>AI is scanning the website...</h2>
+            <p>Running a live cybersecurity sweep for phishing indicators, trust signals, and anomaly patterns.</p>
+        </div>
+    </div>
+
+    <header class="site-header">
+        <!-- Header navigation stays frontend-only and does not alter backend routes. -->
+        <nav class="navbar glass-panel">
+            <div class="nav-brand">
+                <span class="brand-mark">AI</span>
+                <div>
+                    <strong>Phishing Detector</strong>
+                    <span>Cybersecurity Command</span>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="{{ url_for('home') }}" class="active">Home</a>
+                <a href="{{ url_for('history') }}">History</a>
+                <a href="{{ url_for('home') }}#simulation-lab">Phishing Simulation</a>
+                <span class="user-chip" title="{{ current_user.email }}">{{ current_user.username }} | {{ current_user.email }}</span>
+                <form method="POST" action="{{ url_for('auth.logout') }}" class="inline-form">
+                    <button type="submit" class="ghost-button">Logout</button>
+                </form>
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch color theme">
+                    <span class="theme-toggle-track">
+                        <span class="theme-toggle-thumb"></span>
+                    </span>
+                    <span class="theme-toggle-label">Light Mode</span>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <main class="page-wrap home-page">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <section class="flash-stack reveal-fade">
+            {% for category, message in messages %}
+            <div class="flash-card flash-{{ category }} glass-panel">{{ message }}</div>
+            {% endfor %}
+        </section>
+        {% endif %}
+        {% endwith %}
+
+        <section class="alert-banner {{ warning_banner.level }} glass-panel reveal-fade">
+            <div>
+                <strong>{{ warning_banner.title }}</strong>
+                <p>{{ warning_banner.message }}</p>
+            </div>
+            <button type="button" class="alert-badge alert-badge-button" id="recent-threats-trigger" aria-haspopup="dialog" aria-controls="recent-threats-modal">
+                {{ stats.recent_phishing_count }} recent threats
+            </button>
+        </section>
+
+        <!-- Hero section mirrors contemporary AI cybersecurity dashboards. -->
+        <section class="hero-panel glass-panel reveal-fade">
+            <div class="hero-copy">
+                <div class="hero-kicker">Real-Time Cyber Defense Console</div>
+                <h1>AI Phishing Detection System</h1>
+                <p class="subtitle">Scan URLs to detect phishing threats in real time</p>
+
+                <div class="hero-actions">
+                    <button type="button" class="ghost-button" data-switch-target="email-panel">Analyze Email</button>
+                    <button type="button" class="ghost-button" data-switch-target="url-panel">Scan URL</button>
+                    <button type="button" class="ghost-button" data-switch-target="file-panel">Scan File</button>
+                    <a href="{{ url_for('dashboard') }}" class="ghost-button">Open Dashboard</a>
+                </div>
+
+                <div class="hero-metrics">
+                    <div class="metric-chip">
+                        <span>Total Scans</span>
+                        <strong data-counter-target="{{ stats.total_scans }}">{{ stats.total_scans }}</strong>
+                    </div>
+                    <div class="metric-chip">
+                        <span>URL Scans</span>
+                        <strong data-counter-target="{{ stats.total_urls }}">{{ stats.total_urls }}</strong>
+                    </div>
+                    <div class="metric-chip">
+                        <span>Email Scans</span>
+                        <strong data-counter-target="{{ stats.total_emails }}">{{ stats.total_emails }}</strong>
+                    </div>
+                    <div class="metric-chip">
+                        <span>File Scans</span>
+                        <strong data-counter-target="{{ stats.total_files }}">{{ stats.total_files }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hero-visual">
+                <div class="hero-illustration" aria-hidden="true">
+                    <div class="shield-core">
+                        <div class="shield-ring"></div>
+                        <div class="shield-icon">
+                            <svg viewBox="0 0 120 120" aria-hidden="true">
+                                <path d="M60 10 98 24v31c0 24.3-15.1 46.5-38 55C37.1 101.5 22 79.3 22 55V24L60 10Z" />
+                                <path d="m45 60 10 10 22-26" class="shield-check" />
+                            </svg>
+                        </div>
+                        <div class="neural-network">
+                            <span></span><span></span><span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+                    <div class="hero-terminal">
+                        <div class="hero-terminal-head">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <div class="hero-terminal-screen">
+                            <div class="terminal-line terminal-line-accent"></div>
+                            <div class="terminal-line"></div>
+                            <div class="terminal-line terminal-line-short"></div>
+                            <div class="terminal-line terminal-line-safe"></div>
+                            <div class="terminal-radar">
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="workspace-grid">
+            <!-- Scan actions and result cards are kept in a stable two-column grid. -->
+            <section class="scan-panel glass-panel reveal-fade" id="scanner">
+                <div class="section-heading">
+                    <div>
+                        <div class="eyebrow">Threat Analysis Engine</div>
+                        <h2>Analyze with AI</h2>
+                    </div>
+                    <div class="scan-tabs" role="tablist" aria-label="Scan modes">
+                        <button type="button" class="tab-button" data-panel="email-panel">Email</button>
+                        <button type="button" class="tab-button" data-panel="url-panel">URL</button>
+                        <button type="button" class="tab-button" data-panel="file-panel">File</button>
+                    </div>
+                </div>
+
+                <div class="scan-mode" id="email-panel" data-nav-anchor="email-scanner">
+                    <form method="POST" action="{{ url_for('home') }}" class="scan-form js-scan-form">
+                        <label for="email_text">Email Content</label>
+                        <textarea id="email_text" name="email_text" maxlength="5000" placeholder="Paste a suspicious message body, sender details, or full phishing email..." required>{{ request.form.get('email_text', '') }}</textarea>
+                        <div class="input-hint">Maximum 5000 characters. Control characters are removed automatically.</div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-button">
+                                <span class="button-text">Analyze with AI</span>
+                                <span class="button-loader" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="scan-mode" id="url-panel" data-nav-anchor="url-scanner">
+                    <form method="POST" action="{{ url_for('url_scan') }}" class="scan-form js-scan-form">
+                        <label for="input_url">Suspicious URL</label>
+                        <div class="url-input-row">
+                            <input
+                                id="input_url"
+                                name="input_url"
+                                type="text"
+                                maxlength="2048"
+                                placeholder="https://suspicious-domain.example/login"
+                                value="{{ request.form.get('input_url', '') }}"
+                                required
+                            >
+                            <button type="button" class="ghost-button paste-button" id="paste-url-button">Paste URL</button>
+                        </div>
+                        <div class="input-hint">Maximum 2048 characters. URLs are normalized and duplicate entries are ignored.</div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-button">
+                                <span class="button-text">Analyze with AI</span>
+                                <span class="button-loader" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="scan-mode" id="file-panel" data-nav-anchor="file-scanner">
+                    <form method="POST" action="{{ url_for('scan_file') }}" class="scan-form js-scan-form" enctype="multipart/form-data">
+                        <label for="scan_file">Upload File</label>
+                        <input
+                            id="scan_file"
+                            name="scan_file"
+                            type="file"
+                            accept=".exe,.json,.txt,.html"
+                            required
+                        >
+                        <div class="input-hint">Supported types: .exe, .json, .txt, .html. Files are read safely and never executed. Maximum size: 5 MB.</div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-button">
+                                <span class="button-text">Scan File</span>
+                                <span class="button-loader" aria-hidden="true"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <aside class="results-column">
+                <section class="result-card glass-panel reveal-up {% if prediction or url_prediction or file_prediction or error or url_error or file_error %}is-visible{% endif %}" id="result-section" data-has-result="{{ 'true' if prediction or url_prediction or file_prediction or error or url_error or file_error else 'false' }}">
+                    <div class="section-heading">
+                        <div>
+                            <div class="eyebrow">Prediction Output</div>
+                            <h2>Security Verdict</h2>
+                        </div>
+                        {% if file_report_name %}
+                        <div class="result-actions">
+                            <a href="{{ url_for('download_scan_report', report_name=file_report_name) }}" class="ghost-button">Download Report</a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="result-scroll-area">
+                        {% if error %}
+                        <div class="result-box error-box">
+                            <span class="status-dot"></span>
+                            <div>
+                                <h3>Email Scan Error</h3>
+                                <p>{{ error }}</p>
+                            </div>
+                        </div>
+                        {% elif prediction %}
+                        {% set email_confidence_label = confidence_label(risk_score) %}
+                        {% set email_text_lower = (request.form.get('email_text', '') or '')|lower %}
+                        {% set email_explanations = namespace(items=[]) %}
+                        {% if 'verify' in email_text_lower or 'account' in email_text_lower or 'suspend' in email_text_lower or 'login' in email_text_lower or 'confirm' in email_text_lower or 'update' in email_text_lower or 'password' in email_text_lower or 'reset' in email_text_lower %}
+                            {% set email_explanations.items = email_explanations.items + ['Suspicious keywords detected in the submitted email content.'] %}
+                        {% endif %}
+                        {% if detected_urls %}
+                            {% set email_explanations.items = email_explanations.items + ['Presence of URL detected in the message body.'] %}
+                        {% endif %}
+                        {% if 'urgent' in email_text_lower or 'immediately' in email_text_lower or 'expire' in email_text_lower or 'expired' in email_text_lower or 'locked' in email_text_lower or 'unauthorized' in email_text_lower %}
+                            {% set email_explanations.items = email_explanations.items + ['Urgent language patterns detected in the email text.'] %}
+                        {% endif %}
+                        {% if email_url_risk_result and ('Malicious URL detected' in email_url_risk_result or 'Phishing URL' in email_url_risk_result) %}
+                            {% set email_explanations.items = email_explanations.items + ['Suspicious URL pattern or risky external domain structure detected.'] %}
+                        {% elif detected_urls and prediction == 'PHISHING' %}
+                            {% set email_explanations.items = email_explanations.items + ['External link structure contributed to the phishing verdict.'] %}
+                        {% endif %}
+                        {% if not email_explanations.items %}
+                            {% set email_explanations.items = ['The current email was evaluated against keyword, URL, and urgency signals using the existing detection flow.'] %}
+                        {% endif %}
+                        <div class="result-box {{ 'safe-box' if prediction == 'SAFE' else 'phishing-box' }}">
+                            <div class="badge-row">
+                                <span class="prediction-badge {{ 'badge-safe' if prediction == 'SAFE' else 'badge-phishing' }}">
+                                    <span class="result-icon" aria-hidden="true">
+                                        {% if prediction == 'SAFE' %}
+                                        <svg viewBox="0 0 24 24"><path d="M12 2 4.5 5v6.1C4.5 16.4 7.5 20.9 12 22c4.5-1.1 7.5-5.6 7.5-10.9V5L12 2Zm-1.1 13.2-3-3 1.4-1.4 1.6 1.6 4.8-4.8 1.4 1.4-6.2 6.2Z"/></svg>
+                                        {% else %}
+                                        <svg viewBox="0 0 24 24"><path d="M12 3 1.8 20.5h20.4L12 3Zm1 13h-2v-2h2v2Zm0-4h-2V8h2v4Z"/></svg>
+                                        {% endif %}
+                                    </span>
+                                    {{ email_prediction_display or prediction }}
+                                </span>
+                                <span class="risk-pill {{ risk_level|lower }}">{{ risk_level }} Risk</span>
+                            </div>
+                            <p class="result-copy">Email classification completed using the hybrid model and phishing rule engine.</p>
+                            <div class="risk-meta">
+                                <div class="confidence-metric">
+                                    <strong>{{ risk_score }}%</strong>
+                                    <span>Probability</span>
+                                </div>
+                                <div class="confidence-metric">
+                                    <strong class="confidence-label-badge {{ 'confidence-' ~ email_confidence_label|lower }}">{{ email_confidence_label }}</strong>
+                                    <span>AI Confidence</span>
+                                </div>
+                            </div>
+                            <div class="risk-track">
+                                <div class="risk-fill {{ 'risk-fill-safe' if prediction == 'SAFE' else 'risk-fill-danger' }}" style="width: {{ risk_score }}%;"></div>
+                            </div>
+                            {% if email_url_risk_result %}
+                            <div class="inline-notice">Summary: {{ email_url_risk_result }}</div>
+                            {% endif %}
+                            {% if detected_urls %}
+                            <div class="inline-notice">Detected URLs: {{ detected_urls|length }}</div>
+                            {% endif %}
+                            {% if notice %}
+                            <div class="inline-notice">{{ notice }}</div>
+                            {% endif %}
+                            {{ render_explanation_panel(email_explanations.items) }}
+                        </div>
+                        {% elif url_error %}
+                        <div class="result-box error-box">
+                            <span class="status-dot"></span>
+                            <div>
+                                <h3>URL Scan Error</h3>
+                                <p>{{ url_error }}</p>
+                            </div>
+                        </div>
+                        {% elif url_prediction %}
+                        {% set url_confidence_label = confidence_label(url_risk_score) %}
+                        {% set url_explanations = namespace(items=[]) %}
+                        {% if url_reasons %}
+                            {% for reason in url_reasons[:4] %}
+                                {% set url_explanations.items = url_explanations.items + [reason] %}
+                            {% endfor %}
+                        {% else %}
+                            {% set url_explanations.items = ['The submitted URL was analyzed for phishing indicators using the existing URL and webpage logic.'] %}
+                        {% endif %}
+                        <div class="result-box {{ 'safe-box' if url_storage_prediction == 'SAFE' else 'phishing-box' }}">
+                            <div class="badge-row">
+                                <span class="prediction-badge {{ 'badge-safe' if url_storage_prediction == 'SAFE' else 'badge-phishing' }}">
+                                    <span class="result-icon" aria-hidden="true">
+                                        {% if url_storage_prediction == 'SAFE' %}
+                                        <svg viewBox="0 0 24 24"><path d="M12 2 4.5 5v6.1C4.5 16.4 7.5 20.9 12 22c4.5-1.1 7.5-5.6 7.5-10.9V5L12 2Zm-1.1 13.2-3-3 1.4-1.4 1.6 1.6 4.8-4.8 1.4 1.4-6.2 6.2Z"/></svg>
+                                        {% else %}
+                                        <svg viewBox="0 0 24 24"><path d="M12 3 1.8 20.5h20.4L12 3Zm1 13h-2v-2h2v2Zm0-4h-2V8h2v4Z"/></svg>
+                                        {% endif %}
+                                    </span>
+                                    {{ url_prediction }}
+                                </span>
+                                <span class="risk-pill {{ url_risk_level|lower }}">{{ url_risk_level }} Risk</span>
+                            </div>
+                            <p class="result-copy">The final URL verdict combines the existing URL model with webpage content analysis for forms, keywords, and possible brand impersonation.</p>
+                            <div class="risk-meta">
+                                <div class="confidence-metric">
+                                    <strong>{{ url_risk_score }}%</strong>
+                                    <span>Probability</span>
+                                </div>
+                                <div class="confidence-metric">
+                                    <strong class="confidence-label-badge {{ 'confidence-' ~ url_confidence_label|lower }}">{{ url_confidence_label }}</strong>
+                                    <span>AI Confidence</span>
+                                </div>
+                            </div>
+                            <div class="risk-track">
+                                <div class="risk-fill {{ 'risk-fill-safe' if url_storage_prediction == 'SAFE' else 'risk-fill-danger' }}" style="width: {{ url_risk_score }}%;"></div>
+                            </div>
+                            {% if url_model_score is not none or webpage_score is not none %}
+                            <div class="inline-notice">URL model: {{ url_model_score }}% | Webpage content: {{ webpage_score }}%</div>
+                            {% endif %}
+                            {% if url_reasons %}
+                            <div class="inline-notice">Reasons: {{ url_reasons[:3]|join(' | ') }}</div>
+                            {% endif %}
+                            {% if url_notice %}
+                            <div class="inline-notice">{{ url_notice }}</div>
+                            {% endif %}
+                            {{ render_explanation_panel(url_explanations.items) }}
+                        </div>
+                        {% elif file_error %}
+                        <div class="result-box error-box">
+                            <span class="status-dot"></span>
+                            <div>
+                                <h3>File Scan Error</h3>
+                                <p>{{ file_error }}</p>
+                            </div>
+                        </div>
+                        {% elif file_prediction %}
+                        {% set file_confidence_label = confidence_label(file_risk_score) %}
+                        {% set file_explanations = namespace(items=[]) %}
+                        {% if file_keywords %}
+                            {% set file_explanations.items = file_explanations.items + ['Suspicious keywords detected in the uploaded file content.'] %}
+                        {% endif %}
+                        {% if file_urls %}
+                            {% set file_explanations.items = file_explanations.items + ['Presence of URL detected inside the uploaded file.'] %}
+                        {% endif %}
+                        {% if file_reasons %}
+                            {% for reason in file_reasons[:4] %}
+                                {% if reason not in file_explanations.items %}
+                                    {% set file_explanations.items = file_explanations.items + [reason] %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                        {% if not file_explanations.items %}
+                            {% set file_explanations.items = ['The uploaded file was checked for phishing keywords, embedded URLs, and risky file indicators using the existing scanner.'] %}
+                        {% endif %}
+                        <div class="result-box {{ 'safe-box' if file_storage_prediction == 'SAFE' else 'phishing-box' }}">
+                            <div class="badge-row">
+                                <span class="prediction-badge {{ 'badge-safe' if file_storage_prediction == 'SAFE' else 'badge-phishing' }}">
+                                    <span class="result-icon" aria-hidden="true">
+                                        {% if file_storage_prediction == 'SAFE' %}
+                                        <svg viewBox="0 0 24 24"><path d="M12 2 4.5 5v6.1C4.5 16.4 7.5 20.9 12 22c4.5-1.1 7.5-5.6 7.5-10.9V5L12 2Zm-1.1 13.2-3-3 1.4-1.4 1.6 1.6 4.8-4.8 1.4 1.4-6.2 6.2Z"/></svg>
+                                        {% else %}
+                                        <svg viewBox="0 0 24 24"><path d="M12 3 1.8 20.5h20.4L12 3Zm1 13h-2v-2h2v2Zm0-4h-2V8h2v4Z"/></svg>
+                                        {% endif %}
+                                    </span>
+                                    {{ file_prediction }}
+                                </span>
+                                <span class="risk-pill {{ file_risk_level|lower }}">{{ file_risk_level }} Risk</span>
+                            </div>
+                            <p class="result-copy">The file scanner safely reads uploaded content, checks dataset-derived phishing keywords, analyzes embedded URLs with the existing URL model, and generates a PDF report.</p>
+                            <div class="risk-meta">
+                                <div class="confidence-metric">
+                                    <strong>{{ file_risk_score }}%</strong>
+                                    <span>Probability</span>
+                                </div>
+                                <div class="confidence-metric">
+                                    <strong class="confidence-label-badge {{ 'confidence-' ~ file_confidence_label|lower }}">{{ file_confidence_label }}</strong>
+                                    <span>AI Confidence</span>
+                                </div>
+                            </div>
+                            <div class="risk-track">
+                                <div class="risk-fill {{ 'risk-fill-safe' if file_storage_prediction == 'SAFE' else 'risk-fill-danger' }}" style="width: {{ file_risk_score }}%;"></div>
+                            </div>
+                            <div class="inline-notice">File: {{ file_name }} | Type: {{ file_type }}</div>
+                            {% if file_reasons %}
+                            <div class="inline-notice">Reasons: {{ file_reasons[:3]|join(' | ') }}</div>
+                            {% endif %}
+                            {% if file_urls %}
+                            <div class="inline-notice">Detected URLs: {{ file_urls|length }}</div>
+                            {% endif %}
+                            {% if file_keywords %}
+                            <div class="inline-notice">Keywords: {{ file_keywords[:5]|join(', ') }}</div>
+                            {% endif %}
+                            {% if file_notice %}
+                            <div class="inline-notice">{{ file_notice }}</div>
+                            {% endif %}
+                            {{ render_explanation_panel(file_explanations.items) }}
+                        </div>
+                        {% else %}
+                        <div class="empty-state">
+                            <h3>Awaiting Input</h3>
+                            <p>Submit an email, URL, or file to trigger the prediction engine. The result card will show confidence, risk level, and a color-coded safety badge.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </section>
+
+            </aside>
+        </section>
+
+        <!-- Analytics and history use a balanced two-column grid to prevent overlap. -->
+        <section class="analytics-layout">
+            <section class="glass-panel analytics-panel reveal-up">
+                <div class="section-heading">
+                    <div>
+                        <div class="eyebrow">Analytics Section</div>
+                        <h2>Scan Distribution</h2>
+                    </div>
+                </div>
+                <div class="analytics-grid">
+                    {% for item in analytics_bars %}
+                    <div class="progress-card">
+                        <div class="progress-meta">
+                            <span>{{ item.label }}</span>
+                            <strong>{{ item.value }}</strong>
+                        </div>
+                        <div class="risk-track mini-track">
+                            <div class="risk-fill progress-fill {{ item.tone }}" style="width: {{ item.percent }}%;"></div>
+                        </div>
+                        <small>{{ item.percent }}% of total scans</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="glass-panel history-preview-panel reveal-up">
+                <div class="section-heading">
+                    <div>
+                        <div class="eyebrow">Detection History</div>
+                        <h2>Recent Results</h2>
+                    </div>
+                    <a href="{{ url_for('dashboard') }}" class="ghost-button">Manage History</a>
+                </div>
+
+                {% if scans %}
+                <div class="history-stack">
+                    {% for scan in scans %}
+                    <div class="history-row">
+                        <div>
+                            <strong>{{ scan.scan_type }}</strong>
+                            <p>{{ scan.input_text[:88] }}{% if scan.input_text|length > 88 %}...{% endif %}</p>
+                        </div>
+                        <div class="history-meta">
+                            <span class="tag {{ 'tag-safe' if scan.prediction == 'SAFE' else 'tag-phishing' }}">{{ scan.prediction }}</span>
+                            <small>{{ '%.2f'|format(scan.confidence) }}% • {{ scan.timestamp }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <h3>No saved scans yet</h3>
+                    <p>Your latest URL, email, and file scans will appear here automatically.</p>
+                </div>
+                {% endif %}
+            </section>
+        </section>
+
+        <!-- Static phishing-simulation preview keeps the requested nav area frontend-only. -->
+        <section class="glass-panel simulation-panel reveal-up" id="simulation-lab">
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">Phishing Simulation</div>
+                    <h2>Operator Readiness Lab</h2>
+                </div>
+                <a href="{{ url_for('dashboard') }}" class="ghost-button">Review Threat Metrics</a>
+            </div>
+            <p class="subtitle">Use this simulation panel to brief teams on suspicious signals, common lure tactics, and incident-response habits without changing the backend workflow.</p>
+            <div class="simulation-grid">
+                <article class="simulation-card">
+                    <div class="simulation-icon">01</div>
+                    <h3>Link Spoof Drill</h3>
+                    <p>Practice spotting deceptive subdomains, shortened links, and visual impersonation patterns before users click.</p>
+                </article>
+                <article class="simulation-card">
+                    <div class="simulation-icon">02</div>
+                    <h3>Urgency Trigger Drill</h3>
+                    <p>Review examples that pressure users with fake account locks, payment failures, and immediate credential reset requests.</p>
+                </article>
+                <article class="simulation-card">
+                    <div class="simulation-icon">03</div>
+                    <h3>Reporting Workflow</h3>
+                    <p>Rehearse escalation steps: isolate the message, verify the sender, and document the incident in the history panel.</p>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <div class="threats-modal" id="recent-threats-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="recent-threats-title">
+        <div class="threats-modal-backdrop" data-close-threats-modal></div>
+        <div class="threats-modal-panel glass-panel">
+            <button type="button" class="threats-modal-close" id="recent-threats-close" aria-label="Close recent threats popup">X</button>
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">Threat Feed</div>
+                    <h2 id="recent-threats-title">Recent Threats Detected</h2>
+                </div>
+            </div>
+            <div class="threats-modal-list">
+                {% if recent_threats %}
+                    {% for threat in recent_threats %}
+                    <article class="threat-modal-card">
+                        <div class="threat-modal-top">
+                            <strong>{{ threat.scan_type }}</strong>
+                            <span class="risk-pill {{ threat.risk_level|lower }}">{{ threat.prediction }}</span>
+                        </div>
+                        <p>{{ threat.input_text[:110] }}{% if threat.input_text|length > 110 %}...{% endif %}</p>
+                        <small>{{ threat.timestamp }}</small>
+                    </article>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <h3>No recent threats</h3>
+                        <p>Recent suspicious activity will appear here when malicious scans are detected.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <div class="site-footer-inner glass-panel">
+            <span>AI Phishing Detection System</span>
+            <span>Professional cybersecurity dashboard layout with stable cards and responsive grids.</span>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+</body>
+</html>

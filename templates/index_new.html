@@ -1,0 +1,718 @@
+{% macro render_explanation_panel(points) -%}
+    {% if points %}
+    <div class="explanation-panel">
+        <div class="explanation-header">
+            <div class="eyebrow">AI Explanation</div>
+            <h4>Why the system flagged this result</h4>
+        </div>
+        <ul class="explanation-list">
+            {% for point in points %}
+            <li class="explanation-item">
+                <span class="explanation-icon" aria-hidden="true">✔</span>
+                <span>{{ point }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+{%- endmacro %}
+{% set verdict = namespace(
+    has_result=false,
+    is_error=false,
+    scan_mode='Threat Analysis',
+    tone='neutral',
+    badge='Standby',
+    result_heading='Awaiting Input',
+    level='LOW',
+    score=0,
+    score_label='Risk Score',
+    summary='Submit an email, URL, or file to run the existing phishing detection pipeline.',
+    detail='The live gauge will update after the current route returns a result.',
+    note='',
+    confidence_label='LOW',
+    explanations=[],
+    keywords=[],
+    report_name=none
+) %}
+
+{% if error %}
+    {% set verdict.is_error = true %}
+    {% set verdict.scan_mode = 'Email Scan' %}
+    {% set verdict.tone = 'warning' %}
+    {% set verdict.badge = 'Email Error' %}
+    {% set verdict.result_heading = 'SCAN INTERRUPTED' %}
+    {% set verdict.summary = error %}
+    {% set verdict.detail = 'Correct the email input and submit the same route again.' %}
+{% elif prediction %}
+    {% set verdict.has_result = true %}
+    {% set verdict.scan_mode = 'Email Scan' %}
+    {% set verdict.tone = 'danger' if prediction == 'PHISHING' else 'safe' %}
+    {% set verdict.badge = email_prediction_display or prediction %}
+    {% set verdict.result_heading = 'PHISHING DETECTED' if prediction == 'PHISHING' else 'SAFE' %}
+    {% set verdict.level = risk_level or 'LOW' %}
+    {% set verdict.score = risk_score or 0 %}
+    {% set verdict.score_label = 'Confidence' %}
+    {% set verdict.summary = email_url_risk_result or 'Email classification completed with the existing hybrid model.' %}
+    {% set verdict.detail = 'Detected URLs: ' ~ (detected_urls|length) if detected_urls else 'No URLs were extracted from the submitted email.' %}
+    {% set verdict.note = notice or '' %}
+    {% set email_text_lower = (request.form.get('email_text', '') or '')|lower %}
+    {% if 'verify' in email_text_lower or 'account' in email_text_lower or 'suspend' in email_text_lower or 'login' in email_text_lower or 'confirm' in email_text_lower or 'update' in email_text_lower or 'password' in email_text_lower or 'reset' in email_text_lower %}
+        {% set verdict.explanations = verdict.explanations + ['Suspicious keywords detected in the submitted email content.'] %}
+    {% endif %}
+    {% if detected_urls %}
+        {% set verdict.keywords = detected_urls[:6] %}
+        {% set verdict.explanations = verdict.explanations + ['Presence of URL detected in the message body.'] %}
+    {% endif %}
+    {% if 'urgent' in email_text_lower or 'immediately' in email_text_lower or 'expire' in email_text_lower or 'expired' in email_text_lower or 'locked' in email_text_lower or 'unauthorized' in email_text_lower %}
+        {% set verdict.explanations = verdict.explanations + ['Urgent language patterns detected in the email text.'] %}
+    {% endif %}
+    {% if email_url_risk_result and ('Malicious URL detected' in email_url_risk_result or 'Phishing URL' in email_url_risk_result) %}
+        {% set verdict.explanations = verdict.explanations + ['Suspicious URL pattern or risky external domain structure detected.'] %}
+    {% elif detected_urls and prediction == 'PHISHING' %}
+        {% set verdict.explanations = verdict.explanations + ['External link structure contributed to the phishing verdict.'] %}
+    {% endif %}
+{% elif url_error %}
+    {% set verdict.is_error = true %}
+    {% set verdict.scan_mode = 'URL Scan' %}
+    {% set verdict.tone = 'warning' %}
+    {% set verdict.badge = 'URL Error' %}
+    {% set verdict.result_heading = 'SCAN INTERRUPTED' %}
+    {% set verdict.summary = url_error %}
+    {% set verdict.detail = 'Use a full http:// or https:// URL and try again.' %}
+{% elif url_prediction %}
+    {% set verdict.has_result = true %}
+    {% set verdict.scan_mode = 'URL Scan' %}
+    {% set verdict.tone = 'danger' if url_storage_prediction == 'PHISHING' else 'safe' %}
+    {% set verdict.badge = url_prediction %}
+    {% set verdict.result_heading = 'PHISHING DETECTED' if url_storage_prediction == 'PHISHING' else 'SAFE' %}
+    {% set verdict.level = url_risk_level or 'LOW' %}
+    {% set verdict.score = url_risk_score or 0 %}
+    {% set verdict.score_label = 'Risk Score' %}
+    {% set verdict.summary = 'URL verdict generated from the existing URL model and webpage analysis pipeline.' %}
+    {% if url_model_score is not none or webpage_score is not none %}
+        {% set verdict.detail = 'URL model: ' ~ url_model_score ~ '% | Webpage content: ' ~ webpage_score ~ '%' %}
+    {% elif url_notice %}
+        {% set verdict.detail = url_notice %}
+    {% else %}
+        {% set verdict.detail = 'Live URL analysis completed with the existing backend logic.' %}
+    {% endif %}
+    {% set verdict.note = url_notice or '' %}
+    {% if url_reasons %}
+        {% set verdict.keywords = url_reasons[:6] %}
+        {% set verdict.explanations = url_reasons[:4] %}
+    {% else %}
+        {% set verdict.explanations = ['The submitted URL was analyzed for phishing indicators using the existing URL and webpage logic.'] %}
+    {% endif %}
+{% elif file_error %}
+    {% set verdict.is_error = true %}
+    {% set verdict.scan_mode = 'File Scan' %}
+    {% set verdict.tone = 'warning' %}
+    {% set verdict.badge = 'File Error' %}
+    {% set verdict.result_heading = 'SCAN INTERRUPTED' %}
+    {% set verdict.summary = file_error %}
+    {% set verdict.detail = 'Upload one of the supported file types and run the same scan route again.' %}
+{% elif file_prediction %}
+    {% set verdict.has_result = true %}
+    {% set verdict.scan_mode = 'File Scan' %}
+    {% set verdict.tone = 'danger' if file_storage_prediction == 'PHISHING' else 'safe' %}
+    {% set verdict.badge = file_prediction %}
+    {% set verdict.result_heading = 'PHISHING DETECTED' if file_storage_prediction == 'PHISHING' else 'SAFE' %}
+    {% set verdict.level = file_risk_level or 'LOW' %}
+    {% set verdict.score = file_risk_score or 0 %}
+    {% set verdict.score_label = 'Risk Score' %}
+    {% set verdict.summary = 'Uploaded content was scanned safely without changing the file-analysis backend.' %}
+    {% set verdict.detail = 'File: ' ~ file_name ~ ' | Type: ' ~ file_type ~ ' | URLs: ' ~ (file_urls|length) %}
+    {% set verdict.note = file_notice or '' %}
+    {% set verdict.report_name = file_report_name %}
+    {% if file_keywords %}
+        {% set verdict.keywords = file_keywords[:6] %}
+        {% set verdict.explanations = verdict.explanations + ['Suspicious keywords detected in the uploaded file content.'] %}
+    {% elif file_reasons %}
+        {% set verdict.keywords = file_reasons[:6] %}
+    {% endif %}
+    {% if file_urls %}
+        {% set verdict.explanations = verdict.explanations + ['Presence of URL detected inside the uploaded file.'] %}
+    {% endif %}
+    {% if file_reasons %}
+        {% for reason in file_reasons[:4] %}
+            {% if reason not in verdict.explanations %}
+                {% set verdict.explanations = verdict.explanations + [reason] %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+{% endif %}
+{% if verdict.has_result and not verdict.explanations %}
+    {% set verdict.explanations = ['The current result was evaluated against the existing phishing signals and URL checks available in the application.'] %}
+{% endif %}
+{% if verdict.score <= 40 %}
+    {% set verdict.confidence_label = 'LOW' %}
+{% elif verdict.score <= 70 %}
+    {% set verdict.confidence_label = 'MEDIUM' %}
+{% else %}
+    {% set verdict.confidence_label = 'HIGH' %}
+{% endif %}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Phishing Detection System | Cyber Defense Dashboard</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+</head>
+<body class="theme-shell modern-home-shell" data-active-panel="{{ active_panel }}">
+    <div class="background-effects modern-background-effects" aria-hidden="true">
+        <div class="grid-overlay"></div>
+        <div class="circuit-lines"></div>
+        <div class="glow-orb glow-orb-a"></div>
+        <div class="glow-orb glow-orb-b"></div>
+        <div class="tech-shape tech-shape-a"></div>
+        <div class="tech-shape tech-shape-b"></div>
+        <div class="particles">
+            {% for _ in range(18) %}
+            <span class="particle"></span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Loading overlay is unchanged functionally and is still driven by the existing JS. -->
+    <div class="scan-overlay" id="scan-overlay" aria-hidden="true">
+        <div class="scan-overlay-card glass-panel">
+            <div class="scan-radar" aria-hidden="true">
+                <div class="scan-grid"></div>
+                <div class="scan-rings">
+                    <span></span><span></span><span></span>
+                </div>
+                <div class="scan-sweep"></div>
+            </div>
+            <div class="scan-shield">
+                <svg viewBox="0 0 120 120" aria-hidden="true">
+                    <path d="M60 10 98 24v31c0 24.3-15.1 46.5-38 55C37.1 101.5 22 79.3 22 55V24L60 10Z" />
+                </svg>
+            </div>
+            <h2>Threat analysis in progress</h2>
+            <p>Running the existing phishing detection pipeline and refreshing the live dashboard cards.</p>
+        </div>
+    </div>
+
+    <header class="site-header">
+        <nav class="navbar glass-panel">
+            <div class="nav-brand">
+                <span class="brand-mark">AI</span>
+                <div>
+                    <strong>Phishing Detector</strong>
+                    <span>Cybersecurity Command</span>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="{{ url_for('home') }}" class="active">Home</a>
+                <a href="{{ url_for('history') }}">History</a>
+                <a href="{{ url_for('home') }}#simulation-lab">Phishing Simulation</a>
+                <span class="user-chip" title="{{ current_user.email }}">{{ current_user.username }} | {{ current_user.email }}</span>
+                <form method="POST" action="{{ url_for('auth.logout') }}" class="inline-form">
+                    <button type="submit" class="ghost-button">Logout</button>
+                </form>
+                <!-- Hacker Mode only changes the frontend theme and terminal visuals. -->
+                <button type="button" class="ghost-button hacker-toggle" id="hacker-mode-toggle" aria-pressed="false">
+                    Hacker Mode
+                </button>
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch color theme">
+                    <span class="theme-toggle-track">
+                        <span class="theme-toggle-thumb"></span>
+                    </span>
+                    <span class="theme-toggle-label">Light Mode</span>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <main class="page-wrap home-page modern-home">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <section class="flash-stack reveal-fade">
+            {% for category, message in messages %}
+            <div class="flash-card flash-{{ category }} glass-panel">{{ message }}</div>
+            {% endfor %}
+        </section>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Threat banner keeps recent phishing visibility without changing any routes. -->
+        <section class="alert-banner modern-alert-banner glass-panel reveal-fade">
+            <div>
+                <strong>{{ warning_banner.title }}</strong>
+                <p>{{ warning_banner.message }}</p>
+            </div>
+            <button type="button" class="alert-badge alert-badge-button" id="recent-threats-trigger" aria-haspopup="dialog" aria-controls="recent-threats-modal">
+                {{ stats.recent_phishing_count }} recent threats
+            </button>
+        </section>
+
+        <!-- Primary homepage dashboard: hero copy, scanner, live result gauge, and quick stats. -->
+        <section class="command-grid">
+            <section class="glass-panel mission-control-panel reveal-fade">
+                <div class="mission-hero">
+                    <div class="mission-copy">
+                        <div class="hero-kicker">AI Security Operations Center</div>
+                        <h1>Professional phishing detection dashboard for live threat triage.</h1>
+                        <p class="subtitle">Your backend logic remains intact while the homepage now presents scan actions, risk posture, and recent activity in a modern cyber defense console.</p>
+                        <div class="hero-actions">
+                            <button type="button" class="ghost-button" data-switch-target="email-panel">Analyze Email</button>
+                            <button type="button" class="ghost-button" data-switch-target="url-panel">Scan URL</button>
+                            <button type="button" class="ghost-button" data-switch-target="file-panel">Scan File</button>
+                            <a href="{{ url_for('dashboard') }}" class="ghost-button">Open Dashboard</a>
+                        </div>
+                    </div>
+                    <!-- Live Threat Radar is frontend-only and visualizes ambient activity without changing scan routes. -->
+                    <div class="mission-hero-card">
+                        <div class="mission-card-topline">
+                            <div class="mission-card-title">
+                                <div class="eyebrow">Threat Radar</div>
+                                <h3>Live Threat Radar</h3>
+                            </div>
+                            <div class="mission-chip-group">
+                                <div class="mission-chip">Live Monitoring</div>
+                                <div class="mission-chip">Risk Scoring</div>
+                                <div class="mission-chip">Secure Sessions</div>
+                            </div>
+                        </div>
+                        <div class="radar-shell">
+                            <div class="threat-radar" id="threat-radar" aria-hidden="true">
+                                <div class="radar-grid"></div>
+                                <div class="radar-rings">
+                                    <span></span><span></span><span></span><span></span>
+                                </div>
+                                <div class="radar-axis radar-axis-x"></div>
+                                <div class="radar-axis radar-axis-y"></div>
+                                <div class="radar-sweep-beam"></div>
+                                <div class="radar-dot-layer" id="radar-dot-layer"></div>
+                                <div class="radar-core"></div>
+                            </div>
+                            <div class="radar-legend">
+                                <div class="radar-legend-item">
+                                    <span class="legend-dot legend-dot-green"></span>
+                                    <span>Scanning perimeter</span>
+                                </div>
+                                <div class="radar-legend-item">
+                                    <span class="legend-dot legend-dot-cyan"></span>
+                                    <span>Suspicious nodes</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Terminal output is activated by Hacker Mode and stays display-only. -->
+                        <section class="terminal-panel" id="terminal-panel" aria-live="polite">
+                            <div class="terminal-header">
+                                <span class="terminal-dot"></span>
+                                <span class="terminal-dot"></span>
+                                <span class="terminal-dot"></span>
+                                <strong>Operator Console</strong>
+                            </div>
+                            <div class="terminal-status" id="terminal-status">Normal interface active</div>
+                            <pre class="terminal-output" id="terminal-output">> Awaiting Hacker Mode</pre>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- Main scanner keeps the original forms and routes but upgrades the presentation. -->
+                <section class="scanner-glass-card" id="scanner">
+                    <div class="section-heading">
+                        <div>
+                            <div class="eyebrow">Scan Console</div>
+                            <h2>Enter Email or URL</h2>
+                        </div>
+                        <div class="scan-tabs cyber-toggle" role="tablist" aria-label="Scan modes">
+                            <button type="button" class="tab-button" data-panel="email-panel">Email</button>
+                            <button type="button" class="tab-button" data-panel="url-panel">URL</button>
+                            <button type="button" class="tab-button" data-panel="file-panel">File</button>
+                        </div>
+                    </div>
+
+                    <div class="scan-mode" id="email-panel" data-nav-anchor="email-scanner">
+                        <form method="POST" action="{{ url_for('home') }}" class="scan-form js-scan-form">
+                            <label for="email_text">Suspicious Email Content</label>
+                            <textarea id="email_text" name="email_text" maxlength="5000" placeholder="Paste a suspicious message body, sender details, or full phishing email..." required>{{ request.form.get('email_text', '') }}</textarea>
+                            <div class="scan-helper-row">
+                                <div class="input-hint">Maximum 5000 characters. Control characters are removed automatically.</div>
+                                <div class="helper-pill">Email Scanner</div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="primary-button glow-button">
+                                    <span class="button-text">Scan Now</span>
+                                    <span class="button-loader" aria-hidden="true"></span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="scan-mode" id="url-panel" data-nav-anchor="url-scanner">
+                        <form method="POST" action="{{ url_for('url_scan') }}" class="scan-form js-scan-form">
+                            <label for="input_url">Suspicious URL</label>
+                            <div class="url-input-row modern-url-row">
+                                <input
+                                    id="input_url"
+                                    name="input_url"
+                                    type="text"
+                                    maxlength="2048"
+                                    placeholder="https://suspicious-domain.example/login"
+                                    value="{{ request.form.get('input_url', '') }}"
+                                    required
+                                >
+                                <button type="button" class="ghost-button paste-button" id="paste-url-button">Paste URL</button>
+                            </div>
+                            <div class="scan-helper-row">
+                                <div class="input-hint">Maximum 2048 characters. URLs are normalized and duplicate entries are ignored.</div>
+                                <div class="helper-pill">URL Scanner</div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="primary-button glow-button">
+                                    <span class="button-text">Scan Now</span>
+                                    <span class="button-loader" aria-hidden="true"></span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="scan-mode" id="file-panel" data-nav-anchor="file-scanner">
+                        <form method="POST" action="{{ url_for('scan_file') }}" class="scan-form js-scan-form" enctype="multipart/form-data">
+                            <label for="scan_file">Upload File</label>
+                            <input
+                                id="scan_file"
+                                name="scan_file"
+                                type="file"
+                                accept=".exe,.json,.txt,.html"
+                                required
+                            >
+                            <div class="scan-helper-row">
+                                <div class="input-hint">Supported types: .exe, .json, .txt, .html. Files are read safely and never executed. Maximum size: 5 MB.</div>
+                                <div class="helper-pill">File Scanner</div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="primary-button glow-button">
+                                    <span class="button-text">Scan Now</span>
+                                    <span class="button-loader" aria-hidden="true"></span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            </section>
+
+            <!-- Right-side intelligence rail: quick stats, risk gauge, and detected keyword list. -->
+            <aside class="intelligence-rail">
+                <section class="glass-panel quick-stats-card reveal-fade">
+                    <div class="section-heading compact-heading">
+                        <div>
+                            <div class="eyebrow">Quick Stats</div>
+                            <h2>Account Snapshot</h2>
+                        </div>
+                    </div>
+                    <div class="mini-stats-grid">
+                        <article class="mini-stat-tile">
+                            <span>Total Scans</span>
+                            <strong data-counter-target="{{ stats.total_scans }}">{{ stats.total_scans }}</strong>
+                        </article>
+                        <article class="mini-stat-tile danger-tile">
+                            <span>Phishing Detected</span>
+                            <strong data-counter-target="{{ stats.phishing_count }}">{{ stats.phishing_count }}</strong>
+                        </article>
+                        <article class="mini-stat-tile safe-tile">
+                            <span>Safe Count</span>
+                            <strong data-counter-target="{{ stats.safe_count }}">{{ stats.safe_count }}</strong>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="result-card glass-panel modern-result-card reveal-up {% if verdict.has_result or verdict.is_error %}is-visible{% endif %}" id="result-section" data-has-result="{{ 'true' if verdict.has_result or verdict.is_error else 'false' }}">
+                    <div class="section-heading compact-heading">
+                        <div>
+                            <div class="eyebrow">Live Verdict</div>
+                            <h2>Risk Meter</h2>
+                        </div>
+                        {% if verdict.report_name %}
+                        <div class="result-actions">
+                            <a href="{{ url_for('download_scan_report', report_name=verdict.report_name) }}" class="ghost-button">Download Report</a>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="verdict-shell">
+                        <div
+                            class="risk-gauge-card"
+                            data-gauge-value="{{ verdict.score|float }}"
+                            style="--gauge-angle: {{ (verdict.score|float * 1.8) - 90 }}deg;"
+                        >
+                            <div class="risk-gauge">
+                                <div class="risk-gauge-arc"></div>
+                                <div class="risk-gauge-needle" data-gauge-pointer></div>
+                                <div class="risk-gauge-core"></div>
+                                <div class="risk-gauge-readout">
+                                    <strong data-gauge-readout>{{ verdict.score|round(0, 'common')|int }}%</strong>
+                                    <span>{{ verdict.level if verdict.has_result else 'STANDBY' }}</span>
+                                </div>
+                            </div>
+                            <div class="risk-gauge-scale">
+                                <span class="scale-low">LOW</span>
+                                <span class="scale-medium">MEDIUM</span>
+                                <span class="scale-high">HIGH</span>
+                            </div>
+                        </div>
+
+                        {% if verdict.is_error %}
+                        <div class="result-box error-box">
+                            <span class="status-dot"></span>
+                            <div>
+                                <h3>{{ verdict.badge }}</h3>
+                                <p>{{ verdict.summary }}</p>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="verdict-card verdict-{{ verdict.tone }}">
+                            <div class="verdict-topline">
+                                <span class="verdict-scan-mode">{{ verdict.scan_mode }}</span>
+                                <span class="risk-pill {{ verdict.level|lower }}">{{ verdict.level }} Risk</span>
+                            </div>
+                            <div class="verdict-title-block">
+                                <span class="result-type">Result</span>
+                                <h3>{{ verdict.result_heading }}</h3>
+                                <span class="prediction-badge {{ 'badge-phishing' if verdict.tone == 'danger' else 'badge-safe' if verdict.tone == 'safe' else 'badge-safe' }}">{{ verdict.badge }}</span>
+                            </div>
+                            <p class="result-copy">{{ verdict.summary }}</p>
+                            <div class="verdict-data-points">
+                                <div>
+                                    <span>{{ verdict.score_label }}</span>
+                                    <strong>{{ '%.2f'|format(verdict.score) }}%</strong>
+                                </div>
+                                <div>
+                                    <span>AI Confidence</span>
+                                    <strong class="confidence-label-badge {{ 'confidence-' ~ verdict.confidence_label|lower }}">{{ verdict.confidence_label }}</strong>
+                                </div>
+                                <div>
+                                    <span>Risk Level</span>
+                                    <strong>{{ verdict.level }}</strong>
+                                </div>
+                            </div>
+                            <div class="inline-notice">{{ verdict.detail }}</div>
+                            {% if verdict.note %}
+                            <div class="inline-notice">{{ verdict.note }}</div>
+                            {% endif %}
+                            {{ render_explanation_panel(verdict.explanations) }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="glass-panel keyword-panel reveal-up">
+                    <div class="section-heading compact-heading">
+                        <div>
+                            <div class="eyebrow">Keyword Panel</div>
+                            <h2>Detected Keywords / Signals</h2>
+                        </div>
+                    </div>
+                    {% if verdict.keywords %}
+                    <ul class="keyword-list">
+                        {% for item in verdict.keywords %}
+                        <li class="keyword-item">
+                            <span class="keyword-icon">✔</span>
+                            <span>{{ item }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% elif verdict.has_result %}
+                    <div class="empty-state compact-empty-state">
+                        <h3>No keyword flags</h3>
+                        <p>No additional keyword list was returned for this scan. The main verdict above still reflects the existing backend output.</p>
+                    </div>
+                    {% else %}
+                    <div class="empty-state compact-empty-state">
+                        <h3>Waiting for a scan</h3>
+                        <p>Detected keywords, reasons, or extracted URLs will appear here after the next scan completes.</p>
+                    </div>
+                    {% endif %}
+                </section>
+            </aside>
+        </section>
+
+        <!-- Coverage cards preserve homepage analytics while adopting the new dashboard styling. -->
+        <section class="glass-panel analytics-panel modern-analytics-panel reveal-up">
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">Coverage Matrix</div>
+                    <h2>Detection Distribution</h2>
+                </div>
+            </div>
+            <div class="analytics-grid modern-analytics-grid">
+                {% for item in analytics_bars %}
+                <article class="progress-card intelligence-card">
+                    <div class="progress-meta">
+                        <span>{{ item.label }}</span>
+                        <strong>{{ item.value }}</strong>
+                    </div>
+                    <div class="risk-track mini-track">
+                        <div class="risk-fill progress-fill {{ item.tone }}" style="width: {{ item.percent }}%;"></div>
+                    </div>
+                    <small>{{ item.percent }}% of total scans</small>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Attack map visualizes randomized phishing hotspots on a world-map style canvas. -->
+        <section class="glass-panel attack-map-panel reveal-up">
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">Threat Geography</div>
+                    <h2>Phishing Attack Map</h2>
+                </div>
+                <div class="map-status-chip">Live attack simulation</div>
+            </div>
+            <div class="attack-map-grid">
+                <div class="attack-map-copy">
+                    <p class="subtitle">Randomized attack points, pulse alerts, and animated routes help the homepage feel like a live cybersecurity operations center without changing any backend behavior.</p>
+                    <div class="attack-map-metrics">
+                        <article class="attack-map-metric">
+                            <span>Active nodes</span>
+                            <strong id="attack-node-count">0</strong>
+                        </article>
+                        <article class="attack-map-metric">
+                            <span>Linked attacks</span>
+                            <strong id="attack-link-count">0</strong>
+                        </article>
+                        <article class="attack-map-metric">
+                            <span>Monitoring</span>
+                            <strong>GLOBAL</strong>
+                        </article>
+                    </div>
+                </div>
+                <div class="attack-map-shell" id="attack-map-shell" data-tooltip-text="Phishing detected">
+                    <svg class="world-map" viewBox="0 0 960 420" aria-hidden="true">
+                        <g class="world-map-grid">
+                            <path d="M0 60H960M0 140H960M0 220H960M0 300H960M120 0V420M300 0V420M480 0V420M660 0V420M840 0V420" />
+                        </g>
+                        <g class="world-map-mass">
+                            <path d="M86 142c26-34 83-53 142-49l53 8 36-14 42 8 16 22-22 25 10 19-25 13-20 31-54 15-36 31-64-18-28-42-55-24-5-25 10-40z" />
+                            <path d="M382 108l68-22 84 5 64 29 23 39-28 15 9 30-40 10-35-14-39 19-61-9-54-36 9-31-19-17 19-18z" />
+                            <path d="M462 233l44 11 30 42 12 67-30 38-46-16-14-50 8-49-20-22z" />
+                            <path d="M650 121l58-22 91 17 57 34-14 29-59 16-21 34-49 17-39-18 7-22-24-18 8-29-15-15z" />
+                            <path d="M768 272l54-12 47 22 9 46-37 30-64 7-40-23-6-40 37-15z" />
+                        </g>
+                    </svg>
+                    <svg class="attack-lines-svg" id="attack-lines-svg" viewBox="0 0 960 420" preserveAspectRatio="none" aria-hidden="true"></svg>
+                    <div class="attack-points-layer" id="attack-points-layer"></div>
+                    <div class="attack-tooltip" id="attack-tooltip" role="status">Phishing detected</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Recent history remains on the homepage and links to the full management dashboard. -->
+        <section class="glass-panel history-preview-panel modern-history-preview reveal-up">
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">History</div>
+                    <h2>Recent Scan Activity</h2>
+                </div>
+                <a href="{{ url_for('dashboard') }}" class="ghost-button">Manage History</a>
+            </div>
+
+            {% if scans %}
+            <div class="history-stack modern-history-stack">
+                {% for scan in scans %}
+                <article class="history-row modern-history-row">
+                    <div>
+                        <strong>{{ scan.scan_type }}</strong>
+                        <p>{{ scan.input_text[:88] }}{% if scan.input_text|length > 88 %}...{% endif %}</p>
+                    </div>
+                    <div class="history-meta">
+                        <span class="tag {{ 'tag-safe' if scan.prediction == 'SAFE' else 'tag-phishing' }}">{{ scan.prediction }}</span>
+                        <small>{{ '%.2f'|format(scan.confidence) }}% • {{ scan.timestamp }}</small>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <h3>No saved scans yet</h3>
+                <p>Your latest URL, email, and file scans will appear here automatically.</p>
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- Simulation section is preserved and visually upgraded only. -->
+        <section class="glass-panel simulation-panel modern-simulation-panel reveal-up" id="simulation-lab">
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">Phishing Simulation</div>
+                    <h2>Operator Readiness Lab</h2>
+                </div>
+                <a href="{{ url_for('dashboard') }}" class="ghost-button">Review Threat Metrics</a>
+            </div>
+            <p class="subtitle">Use this simulation panel to brief teams on suspicious signals, common lure tactics, and incident-response habits without changing the backend workflow.</p>
+            <div class="simulation-grid">
+                <article class="simulation-card">
+                    <div class="simulation-icon">01</div>
+                    <h3>Link Spoof Drill</h3>
+                    <p>Practice spotting deceptive subdomains, shortened links, and visual impersonation patterns before users click.</p>
+                </article>
+                <article class="simulation-card">
+                    <div class="simulation-icon">02</div>
+                    <h3>Urgency Trigger Drill</h3>
+                    <p>Review examples that pressure users with fake account locks, payment failures, and immediate credential reset requests.</p>
+                </article>
+                <article class="simulation-card">
+                    <div class="simulation-icon">03</div>
+                    <h3>Reporting Workflow</h3>
+                    <p>Rehearse escalation steps: isolate the message, verify the sender, and document the incident in the history panel.</p>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal remains homepage-only and uses the existing recent-threat dataset. -->
+    <div class="threats-modal" id="recent-threats-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="recent-threats-title">
+        <div class="threats-modal-backdrop" data-close-threats-modal></div>
+        <div class="threats-modal-panel glass-panel">
+            <button type="button" class="threats-modal-close" id="recent-threats-close" aria-label="Close recent threats popup">X</button>
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">Threat Feed</div>
+                    <h2 id="recent-threats-title">Recent Threats Detected</h2>
+                </div>
+            </div>
+            <div class="threats-modal-list">
+                {% if recent_threats %}
+                    {% for threat in recent_threats %}
+                    <article class="threat-modal-card">
+                        <div class="threat-modal-top">
+                            <strong>{{ threat.scan_type }}</strong>
+                            <span class="risk-pill {{ threat.risk_level|lower }}">{{ threat.risk_level }}</span>
+                        </div>
+                        <p>{{ threat.input_text[:110] }}{% if threat.input_text|length > 110 %}...{% endif %}</p>
+                        <small>{{ threat.timestamp }}</small>
+                    </article>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <h3>No recent threats</h3>
+                        <p>Recent suspicious activity will appear here when malicious scans are detected.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <div class="site-footer-inner glass-panel">
+            <span>AI Phishing Detection System</span>
+            <span>Homepage UI upgraded with a modern cybersecurity dashboard while keeping the original backend logic untouched.</span>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/radar.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Phishing Detector | Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
+</head>
+<body class="theme-shell">
+    <div class="background-effects history-effects" aria-hidden="true">
+        <div class="grid-overlay"></div>
+        <div class="circuit-lines"></div>
+        <div class="glow-orb glow-orb-a"></div>
+        <div class="glow-orb glow-orb-b"></div>
+    </div>
+
+    <header class="site-header">
+    <nav class="navbar glass-panel">
+        <div class="nav-brand">
+            <span class="brand-mark">AI</span>
+            <div>
+                <strong>Phishing Detector</strong>
+                <span>Cybersecurity Command</span>
+            </div>
+        </div>
+        <div class="nav-links">
+            <a href="{{ url_for('home') }}">Home</a>
+            <a href="{{ url_for('history') }}">History</a>
+            <a href="{{ url_for('home') }}#simulation-lab">Phishing Simulation</a>
+            <span class="user-chip" title="{{ current_user.email }}">{{ current_user.username }} | {{ current_user.email }}</span>
+            <form method="POST" action="{{ url_for('auth.logout') }}" class="inline-form">
+                <button type="submit" class="ghost-button">Logout</button>
+            </form>
+            <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch color theme">
+                <span class="theme-toggle-track">
+                    <span class="theme-toggle-thumb"></span>
+                </span>
+                <span class="theme-toggle-label">Light Mode</span>
+            </button>
+        </div>
+    </nav>
+    </header>
+
+    <main class="page-wrap subpage-wrap dashboard-page">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <section class="flash-stack reveal-fade">
+            {% for category, message in messages %}
+            <div class="flash-card flash-{{ category }} glass-panel">{{ message }}</div>
+            {% endfor %}
+        </section>
+        {% endif %}
+        {% endwith %}
+
+        <section class="alert-banner {{ warning_banner.level }} glass-panel reveal-fade">
+            <div>
+                <strong>{{ warning_banner.title }}</strong>
+                <p>{{ warning_banner.message }}</p>
+            </div>
+            <span class="alert-badge">{{ stats.phishing_rate }}% phishing rate</span>
+        </section>
+
+        <section class="glass-panel card reveal-fade">
+            <div class="section-heading">
+                <div>
+                    <div class="eyebrow">Threat Intelligence</div>
+                    <h1>Security Dashboard</h1>
+                </div>
+                <div class="action-cluster">
+                    <a href="{{ url_for('export_history_csv', scan_type=filters.scan_type, prediction=filters.prediction, keyword=filters.keyword) }}" class="ghost-button">Export CSV</a>
+                    <a href="{{ url_for('download_report') }}" class="ghost-button">Download Report</a>
+                </div>
+            </div>
+            <p class="subtitle">Analytics, filtered detection history, deletion controls, and recent phishing activity for your signed-in account.</p>
+
+                <div class="stats-grid dashboard-grid">
+                    <div class="stat-box accent">
+                        <span>Total URLs Scanned</span>
+                        <strong data-counter-target="{{ stats.total_urls }}">{{ stats.total_urls }}</strong>
+                    </div>
+                    <div class="stat-box accent">
+                        <span>Total Emails Scanned</span>
+                        <strong data-counter-target="{{ stats.total_emails }}">{{ stats.total_emails }}</strong>
+                    </div>
+                    <div class="stat-box danger">
+                        <span>Phishing Detected</span>
+                        <strong data-counter-target="{{ stats.phishing_count }}">{{ stats.phishing_count }}</strong>
+                    </div>
+                    <div class="stat-box">
+                        <span>Safe Inputs</span>
+                        <strong data-counter-target="{{ stats.safe_count }}">{{ stats.safe_count }}</strong>
+                    </div>
+                </div>
+
+            <div class="analytics-grid analytics-grid-wide">
+                {% for item in analytics_bars %}
+                <div class="progress-card">
+                    <div class="progress-meta">
+                        <span>{{ item.label }}</span>
+                        <strong>{{ item.value }}</strong>
+                    </div>
+                    <div class="risk-track mini-track">
+                        <div class="risk-fill progress-fill {{ item.tone }}" style="width: {{ item.percent }}%;"></div>
+                    </div>
+                    <small>{{ item.percent }}% of total scans</small>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="dashboard-grid-layout">
+            <section class="glass-panel card reveal-up">
+                <div class="section-heading">
+                    <div>
+                        <div class="eyebrow">History Management</div>
+                        <h2>Detection History</h2>
+                    </div>
+                </div>
+
+                <form method="GET" action="{{ url_for('dashboard') }}" class="filter-bar">
+                    <div class="filter-field search-field">
+                        <label for="keyword">Search</label>
+                        <input id="keyword" type="text" name="keyword" value="{{ filters.keyword }}" placeholder="Search by keyword">
+                    </div>
+                    <div class="filter-field">
+                        <label for="scan_type">Input Type</label>
+                        <select id="scan_type" name="scan_type">
+                            <option value="">All</option>
+                            <option value="URL" {% if filters.scan_type == 'URL' %}selected{% endif %}>URL</option>
+                            <option value="EMAIL" {% if filters.scan_type == 'EMAIL' %}selected{% endif %}>Email</option>
+                            <option value="FILE" {% if filters.scan_type == 'FILE' %}selected{% endif %}>File</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label for="prediction">Prediction</label>
+                        <select id="prediction" name="prediction">
+                            <option value="">All</option>
+                            <option value="SAFE" {% if filters.prediction == 'SAFE' %}selected{% endif %}>Safe</option>
+                            <option value="PHISHING" {% if filters.prediction == 'PHISHING' %}selected{% endif %}>Phishing</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button type="submit" class="ghost-button">Apply</button>
+                        <a href="{{ url_for('dashboard') }}" class="ghost-button">Reset</a>
+                    </div>
+                </form>
+
+                <div class="history-actions">
+                    <form method="POST" action="{{ url_for('history_delete_all') }}" class="inline-form">
+                        <input type="hidden" name="return_to" value="{{ request.full_path if request.query_string else request.path }}">
+                        <button type="submit" class="ghost-button danger-button">Delete All History</button>
+                    </form>
+                </div>
+
+                {% if scans %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date &amp; Time</th>
+                                <th>Type</th>
+                                <th>Input</th>
+                                <th>Prediction</th>
+                                <th>Confidence</th>
+                                <th>Risk</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for scan in scans %}
+                            <tr>
+                                <td>{{ scan.timestamp }}</td>
+                                <td>{{ scan.scan_type }}</td>
+                                <td class="input-cell" title="{{ scan.input_text }}">{{ scan.input_text[:70] }}{% if scan.input_text|length > 70 %}...{% endif %}</td>
+                                <td><span class="tag {{ 'tag-safe' if scan.prediction == 'SAFE' else 'tag-phishing' }}">{{ scan.prediction }}</span></td>
+                                <td>{{ '%.2f'|format(scan.confidence) }}%</td>
+                                <td><span class="risk-pill {{ scan.risk_level|lower }}">{{ scan.risk_level }}</span></td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('history_delete', scan_id=scan.id) }}" class="inline-form">
+                                        <input type="hidden" name="return_to" value="{{ request.full_path if request.query_string else request.path }}">
+                                        <button type="submit" class="table-action danger-button">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <h3>No matching history</h3>
+                    <p>Adjust the filters or run new URL and email scans from the home dashboard.</p>
+                </div>
+                {% endif %}
+            </section>
+
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+</body>
+</html>
