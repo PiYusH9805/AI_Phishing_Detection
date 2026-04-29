@@ -55,7 +55,7 @@ AI_Phishing_Detection/
 ### 1️⃣ Clone the repository
 
 ```bash
-git clone https://github.com/your-username/AI_Phishing_Detection.git
+git clone https://github.com/PiYusH9805/AI_Phishing_Detection.git
 cd AI_Phishing_Detection
 ```
 
